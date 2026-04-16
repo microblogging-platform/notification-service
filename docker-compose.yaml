@@ -1,0 +1,48 @@
+services:
+  mongodb:
+    image: bitnami/mongodb:latest
+    container_name: notification-mongodb
+    environment:
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_REPLICA_SET_NAME=rs0
+      - MONGODB_REPLICA_SET_KEY=replicasetkey
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb
+      - MONGODB_PORT_NUMBER=27017
+      - MONGODB_ROOT_PASSWORD=devpassword
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/bitnami/mongodb
+    networks:
+      - notification-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-service
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - notification-network
+      - microblogging-network
+    restart: on-failure
+
+volumes:
+  mongodb_data:
+
+networks:
+  notification-network:
+    driver: bridge
+  microblogging-network:
+    external: true
